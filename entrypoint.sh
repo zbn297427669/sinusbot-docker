@@ -5,9 +5,19 @@ uname -srmo
 date
 
 if [ -d "default_scripts" ]; then
-  mv default_scripts/* scripts
-  rm -r default_scripts
-  echo "Copied default scripts"
+  mkdir -p scripts
+  # Only add missing defaults — never overwrite customized scripts (e.g. AloneMode).
+  for f in default_scripts/*; do
+    [ -e "$f" ] || continue
+    base="$(basename "$f")"
+    if [ -e "scripts/$base" ]; then
+      echo "Keeping existing script: $base"
+    else
+      mv "$f" "scripts/$base"
+      echo "Installed default script: $base"
+    fi
+  done
+  rm -rf default_scripts
 fi
 
 if [ ! -f "data/config.ini" ]; then
@@ -72,6 +82,83 @@ YTDL="$SETPRIV $YTDL"
 
 echo "Clearing yt-dlp cache..."
 $YTDL --rm-cache-dir
+
+# YouTube: wrap yt-dlp so SinusBot always gets cookies + a safe format selector.
+# Format 18 is rarely offered now; "-f 18/best" → exit 1 → playlist skip storms.
+COOKIES_FILE="data/youtube-cookies.txt"
+YTDLP_CONF="data/yt-dlp.conf"
+YTDLP_CONF_EXAMPLE="yt-dlp.conf.example"
+WRAPPER="data/yt-dlp-wrapper.sh"
+# Prefer low-bitrate audio; best* = progressive fallback without ffmpeg merge.
+SAFE_YTDL_FORMAT='ba[abr<=128]/bestaudio/best*'
+
+write_safe_ytdlp_conf() {
+  cat > "${YTDLP_CONF}" << EOF
+# Auto-managed default (see yt-dlp.conf.example in the repo).
+# Do NOT use -f 18 / 18/best — often unavailable → yt-dlp exit 1 skip storms.
+-f ${SAFE_YTDL_FORMAT}
+--no-part
+--socket-timeout 30
+--retries 5
+EOF
+}
+
+# Seed or repair data/yt-dlp.conf before generating the wrapper.
+if [[ ! -f "${YTDLP_CONF}" ]]; then
+  if [[ -f "${YTDLP_CONF_EXAMPLE}" ]]; then
+    cp "${YTDLP_CONF_EXAMPLE}" "${YTDLP_CONF}"
+    echo "Installed ${YTDLP_CONF} from ${YTDLP_CONF_EXAMPLE}"
+  else
+    write_safe_ytdlp_conf
+    echo "Installed default ${YTDLP_CONF} (safe audio format)"
+  fi
+elif grep -qE '^[[:space:]]*-f[[:space:]]+([^#]*[[:space:]])?18([/[:space:]]|$)' "${YTDLP_CONF}" \
+  || grep -qE '^[[:space:]]*-f[[:space:]]+18/' "${YTDLP_CONF}"; then
+  bak="${YTDLP_CONF}.bak.$(date +%Y%m%d%H%M%S)"
+  cp "${YTDLP_CONF}" "${bak}"
+  write_safe_ytdlp_conf
+  echo "WARN: ${YTDLP_CONF} requested format 18 (often unavailable)."
+  echo "WARN: backed up to ${bak} and replaced with a safe -f ${SAFE_YTDL_FORMAT}"
+fi
+
+YTDL_REAL="$(command -v yt-dlp || true)"
+if [[ -z "${YTDL_REAL}" && -x /usr/local/bin/yt-dlp ]]; then
+  YTDL_REAL="/usr/local/bin/yt-dlp"
+fi
+if [[ -n "${YTDL_REAL}" ]]; then
+  # Wrapper: cookies + conf when present; if no conf, inject SAFE_YTDL_FORMAT on CLI.
+  cat > "${WRAPPER}" << EOF
+#!/bin/sh
+REAL="${YTDL_REAL}"
+COOKIES="/opt/sinusbot/data/youtube-cookies.txt"
+CONF="/opt/sinusbot/data/yt-dlp.conf"
+SAFE_FMT="${SAFE_YTDL_FORMAT}"
+EXTRA=""
+if [ -f "\$COOKIES" ]; then
+  EXTRA="\$EXTRA --cookies \$COOKIES"
+fi
+if [ -f "\$CONF" ]; then
+  EXTRA="\$EXTRA --config-locations \$CONF"
+else
+  # No conf: still force a safe format so SinusBot never defaults into missing itags.
+  EXTRA="\$EXTRA -f \$SAFE_FMT"
+fi
+exec "\$REAL" \$EXTRA "\$@"
+EOF
+  chmod 755 "${WRAPPER}"
+  # Point SinusBot at the wrapper (create key if missing; never clobber other settings)
+  if grep -q '^YoutubeDLPath' data/config.ini 2>/dev/null; then
+    sed -i 's|^YoutubeDLPath.*|YoutubeDLPath = "/opt/sinusbot/data/yt-dlp-wrapper.sh"|' data/config.ini
+  else
+    printf '\nYoutubeDLPath = "/opt/sinusbot/data/yt-dlp-wrapper.sh"\n' >> data/config.ini
+  fi
+  if [[ -f "${COOKIES_FILE}" ]]; then
+    echo "YouTube cookies found — yt-dlp wrapper enabled"
+  else
+    echo "No YouTube cookies yet — put Netscape cookies at data/youtube-cookies.txt then restart"
+  fi
+  echo "yt-dlp conf: $([ -f "${YTDLP_CONF}" ] && echo present || echo missing) | safe format: ${SAFE_YTDL_FORMAT}"
+fi
 
 echo "Starting SinusBot..."
 if [[ -v OVERRIDE_PASSWORD ]]; then

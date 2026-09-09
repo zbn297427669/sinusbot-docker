@@ -1,13 +1,22 @@
 services:
   sinusbot:
-    image: sinusbot/docker
+    image: ghcr.io/gamer92000/sinusbot-docker:latest
     container_name: sinusbot
     restart: unless-stopped
+    # Run via bash so a host-mounted entrypoint without +x still works
+    entrypoint: ["/bin/bash", "/opt/sinusbot/entrypoint.sh"]
     ports:
-      - 8087:8087
+      - 9987:8087
     volumes:
       - ./scripts:/opt/sinusbot/scripts
       - ./data:/opt/sinusbot/data
+      # Use local entrypoint (yt-dlp cookies wrapper) without rebuilding the image
+      - ./entrypoint.sh:/opt/sinusbot/entrypoint.sh:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   teamspeak:
     image: teamspeaksystems/teamspeak6-server:latest
@@ -21,3 +30,8 @@ services:
       - TSSERVER_LICENSE_ACCEPTED=accept
     volumes:
       - ./teamspeak:/var/tsserver
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"

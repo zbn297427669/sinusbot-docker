@@ -2,3 +2,9 @@
 data
 scripts
 .vscode
+
+# secrets / local env
+.env
+**/youtube-cookies.txt
+**/cookies.txt
+__pycache__/

@@ -1,0 +1,14 @@
+# Recommended yt-dlp options for SinusBot (copy to data/yt-dlp.conf).
+#
+# Why not "-f 18" / "-f 18/best"?
+#   Format 18 (progressive mp4 360p) is rarely offered anymore. Requesting it
+#   makes yt-dlp exit 1 → SinusBot skips every track in a "playlist storm".
+# Prefer low-bitrate audio; fall back to any bestaudio, then best progressive
+# (best* avoids needing ffmpeg to merge bestvideo+bestaudio).
+-f ba[abr<=128]/bestaudio/best*
+--no-part
+--socket-timeout 30
+--retries 5
+
+# Optional: if YouTube rate-limits your VPS IP, add a proxy here, e.g.:
+# --proxy http://127.0.0.1:7890
