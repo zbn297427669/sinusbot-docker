@@ -1,6 +1,17 @@
 # docker-compose local volume names
-data
-scripts
+/data/
+# Ignore most scripts (official / one-off), but track our maintained overlays:
+/scripts/*
+!/scripts/ReconnectWatchdogTS6.js
+!/scripts/PlaybackGuardTS6.js
+!/scripts/PlaylistMoodTS6.js
+!/scripts/AloneModeTS6.js
+!/scripts/AFK_Mover_TS6.js
+!/scripts/WelcomeMessageTS6.js
+!/scripts/WmHelpersTS6.js
+!/scripts/BotHealthTS6.js
+!/scripts/LucioRadio.js
+!/scripts/command.js
 .vscode
 
 # secrets / local env
