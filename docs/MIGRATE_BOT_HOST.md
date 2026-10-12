@@ -39,9 +39,15 @@ STOP=1 SLIM=1 bash scripts/backup-bot-host.sh /tmp/sinusbot-backup.tgz
 ```
 
 > `data/` 里 cookies / ts3 secrets 常为 `9987` + `600`，脚本会自动 `sudo tar` 打包；按提示输入 sudo 密码即可。  
-> `SLIM=1` 默认输出名为 `backups/sinusbot-host-slim_时间戳.tgz`，体积通常小很多，适合 SFTP；配置 / DB / cookies / 身份 / 脚本仍会带上。
+> `SLIM=1` 默认输出名为 `backups/sinusbot-host-slim_时间戳.tgz`，会排除 cache/tmp/logs；配置 / DB / cookies / 身份 / 脚本仍会带上。  
+> 打完包会打印 **Largest members**；若还有 `radio.json`、大头像等占体积，可再加：  
+> `EXTRA_EXCLUDES='data/radio.json'`（按列表里的路径填）。
 
-大文件传输优先 `rsync -avP --partial`，断了可续传。
+**约 30MB 对 rsync/scp 通常足够小**；SFTP 客户端超时多半是工具限制，优先：
+
+```bash
+rsync -avP --partial backups/sinusbot-host-slim_XXXX.tgz user@新服务器:/tmp/
+```
 
 把生成的 `.tgz` 拷到新机（`scp` / `rsync` 等）。
 

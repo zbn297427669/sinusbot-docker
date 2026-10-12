@@ -112,12 +112,28 @@ if [[ -f "$OUT" ]]; then
 fi
 
 SIZE="$(du -h "$OUT" 2>/dev/null | awk '{print $1}')"
+SIZE_BYTES="$(du -b "$OUT" 2>/dev/null | awk '{print $1}')"
 echo "==> Archive size: ${SIZE:-unknown}"
 
 echo "==> Contents (first 40):"
 tar tzf "$OUT" | head -40
 COUNT="$(tar tzf "$OUT" | wc -l | tr -d ' ')"
 echo "… ($COUNT entries)"
+
+echo "==> Largest members (top 15):"
+# tar tvz: permissions/owner/size/date/name — sort by size column
+tar tvzf "$OUT" 2>/dev/null | awk '{print $3, $6}' | sort -nr | head -15 | awk '{
+  s=$1; name=$2;
+  if (s>=1048576) printf "  %6.1fM  %s\n", s/1048576, name;
+  else if (s>=1024) printf "  %6.1fK  %s\n", s/1024, name;
+  else printf "  %6dB  %s\n", s, name;
+}' || true
+
+if [[ -n "${SIZE_BYTES:-}" && "${SIZE_BYTES}" -gt 52428800 ]]; then
+  echo
+  echo "TIP: archive > 50MB. Prefer: rsync -avP --partial $OUT user@newhost:/tmp/"
+  echo "     Or exclude big paths: EXTRA_EXCLUDES='data/radio.json data/foo' SLIM=1 …"
+fi
 
 # Soft checks for common runtime files (existence only; may be unreadable)
 exists() { [[ -e "$1" ]] || sudo test -e "$1" 2>/dev/null; }
