@@ -12,6 +12,8 @@
 !/scripts/BotHealthTS6.js
 !/scripts/LucioRadio.js
 !/scripts/command.js
+!/scripts/backup-bot-host.sh
+!/scripts/restore-bot-host.sh
 .vscode
 
 # secrets / local env
@@ -19,3 +21,6 @@
 **/youtube-cookies.txt
 **/cookies.txt
 __pycache__/
+
+# local backup archives
+/backups/
