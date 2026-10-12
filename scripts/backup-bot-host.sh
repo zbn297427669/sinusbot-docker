@@ -5,13 +5,20 @@
 #   ./scripts/backup-bot-host.sh /path/to/out/sinusbot-backup.tgz
 #   STOP=1 ./scripts/backup-bot-host.sh          # docker compose stop sinusbot first
 #   INCLUDE_TS=1 ./scripts/backup-bot-host.sh    # also pack ./teamspeak (local TS6 volume)
+#   SLIM=1 ./scripts/backup-bot-host.sh          # exclude cache/tmp/logs (smaller, for SFTP)
+#   SLIM=1 EXTRA_EXCLUDES='data/radio.json' ./scripts/backup-bot-host.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
-OUT="${1:-"$ROOT/backups/sinusbot-host_${STAMP}.tgz"}"
+if [[ "${SLIM:-0}" == "1" ]]; then
+  DEFAULT_OUT="$ROOT/backups/sinusbot-host-slim_${STAMP}.tgz"
+else
+  DEFAULT_OUT="$ROOT/backups/sinusbot-host_${STAMP}.tgz"
+fi
+OUT="${1:-$DEFAULT_OUT}"
 mkdir -p "$(dirname "$OUT")"
 
 if [[ "${STOP:-0}" == "1" ]]; then
@@ -47,6 +54,36 @@ if [[ "${INCLUDE_TS:-0}" == "1" ]]; then
   fi
 fi
 
+# Exclude patterns for tar (--exclude=PATTERN, matched against member names).
+EXCLUDES=()
+if [[ "${SLIM:-0}" == "1" ]]; then
+  # Runtime caches / temp — not required to restore instances, cookies, DB, scripts.
+  EXCLUDES+=(
+    --exclude='data/cache'
+    --exclude='data/cache/*'
+    --exclude='data/tmp'
+    --exclude='data/tmp/*'
+    --exclude='data/logs'
+    --exclude='data/logs/*'
+    --exclude='data/*/cache'
+    --exclude='data/*/cache/*'
+    --exclude='data/*/tmp'
+    --exclude='data/*/tmp/*'
+    --exclude='data/*/logs'
+    --exclude='data/*/logs/*'
+  )
+  echo "==> SLIM=1 — excluding cache/tmp/logs under data/"
+fi
+
+# Extra excludes: space-separated paths/globs, e.g. EXTRA_EXCLUDES='data/radio.json data/foo'
+if [[ -n "${EXTRA_EXCLUDES:-}" ]]; then
+  # shellcheck disable=SC2206
+  for pat in ${EXTRA_EXCLUDES}; do
+    EXCLUDES+=(--exclude="$pat")
+    echo "==> extra exclude: $pat"
+  done
+fi
+
 # data/ is often owned by 9987 with mode 600 (cookies, ts3 secrets) — ubuntu cannot read.
 TAR=(tar)
 if [[ "$(id -u)" -ne 0 ]] && find data -type f ! -readable 2>/dev/null | grep -q .; then
@@ -62,14 +99,20 @@ fi
 
 echo "==> Creating $OUT"
 echo "    packing: ${ITEMS[*]}"
-"${TAR[@]}" czf "$OUT" "${ITEMS[@]}"
+if ((${#EXCLUDES[@]})); then
+  echo "    excludes: ${EXCLUDES[*]}"
+fi
+"${TAR[@]}" czf "$OUT" "${EXCLUDES[@]+"${EXCLUDES[@]}"}" "${ITEMS[@]}"
 
 # Archive may be root-owned when created with sudo tar
-if [[ -f "$OUT" && ! -w "$OUT" ]] || [[ -f "$OUT" && "$(stat -c %u "$OUT" 2>/dev/null || true)" == "0" ]]; then
+if [[ -f "$OUT" ]]; then
   if command -v sudo >/dev/null 2>&1; then
     sudo chown "$(id -u):$(id -g)" "$OUT" 2>/dev/null || true
   fi
 fi
+
+SIZE="$(du -h "$OUT" 2>/dev/null | awk '{print $1}')"
+echo "==> Archive size: ${SIZE:-unknown}"
 
 echo "==> Contents (first 40):"
 tar tzf "$OUT" | head -40
@@ -82,6 +125,11 @@ exists data/config.ini || echo "WARN: data/config.ini missing — instance setti
 exists data/youtube-cookies.txt || echo "WARN: data/youtube-cookies.txt missing — YouTube may need fresh cookies."
 exists data/yt-dlp.conf || echo "WARN: data/yt-dlp.conf missing — entrypoint will seed a safe default on start."
 [[ -d scripts ]] || echo "WARN: scripts/ missing — custom overlays will not be in this archive."
+
+if [[ "${SLIM:-0}" == "1" ]]; then
+  echo
+  echo "NOTE: SLIM backup omitted cache/tmp/logs. Config, DB, cookies, identities, scripts are kept."
+fi
 
 echo
 echo "Done. Copy the archive to the new host, then:"

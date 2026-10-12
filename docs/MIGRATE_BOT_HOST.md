@@ -25,14 +25,23 @@
 # 推荐：先停 Bot，避免库写到一半
 STOP=1 bash scripts/backup-bot-host.sh
 
+# 瘦身（推荐迁机 / SFTP）：排除 data 下 cache、tmp、logs
+STOP=1 SLIM=1 bash scripts/backup-bot-host.sh
+
 # 或指定输出路径
-STOP=1 bash scripts/backup-bot-host.sh /tmp/sinusbot-backup.tgz
+STOP=1 SLIM=1 bash scripts/backup-bot-host.sh /tmp/sinusbot-backup.tgz
+
+# 额外排除（空格分隔）
+# STOP=1 SLIM=1 EXTRA_EXCLUDES='data/radio.json' bash scripts/backup-bot-host.sh
 
 # 若本机还跑了 compose 里的 teamspeak 服务，一并打包：
 # INCLUDE_TS=1 STOP=1 bash scripts/backup-bot-host.sh
 ```
 
-> `data/` 里 cookies / ts3 secrets 常为 `9987` + `600`，脚本会自动 `sudo tar` 打包；按提示输入 sudo 密码即可。
+> `data/` 里 cookies / ts3 secrets 常为 `9987` + `600`，脚本会自动 `sudo tar` 打包；按提示输入 sudo 密码即可。  
+> `SLIM=1` 默认输出名为 `backups/sinusbot-host-slim_时间戳.tgz`，体积通常小很多，适合 SFTP；配置 / DB / cookies / 身份 / 脚本仍会带上。
+
+大文件传输优先 `rsync -avP --partial`，断了可续传。
 
 把生成的 `.tgz` 拷到新机（`scp` / `rsync` 等）。
 
