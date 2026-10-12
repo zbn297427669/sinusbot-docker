@@ -21,17 +21,18 @@
 在**当前部署目录**（含 `data/`）执行：
 
 ```bash
-chmod +x scripts/backup-bot-host.sh scripts/restore-bot-host.sh
-
+# scripts/ 若属主是 9987，用 bash 调用即可（不必 chmod +x）
 # 推荐：先停 Bot，避免库写到一半
-STOP=1 ./scripts/backup-bot-host.sh
+STOP=1 bash scripts/backup-bot-host.sh
 
 # 或指定输出路径
-STOP=1 ./scripts/backup-bot-host.sh /tmp/sinusbot-backup.tgz
+STOP=1 bash scripts/backup-bot-host.sh /tmp/sinusbot-backup.tgz
 
 # 若本机还跑了 compose 里的 teamspeak 服务，一并打包：
-# INCLUDE_TS=1 STOP=1 ./scripts/backup-bot-host.sh
+# INCLUDE_TS=1 STOP=1 bash scripts/backup-bot-host.sh
 ```
+
+> `data/` 里 cookies / ts3 secrets 常为 `9987` + `600`，脚本会自动 `sudo tar` 打包；按提示输入 sudo 密码即可。
 
 把生成的 `.tgz` 拷到新机（`scp` / `rsync` 等）。
 
