@@ -5,7 +5,7 @@
 #   ./scripts/backup-bot-host.sh /path/to/out/sinusbot-backup.tgz
 #   STOP=1 ./scripts/backup-bot-host.sh          # docker compose stop sinusbot first
 #   INCLUDE_TS=1 ./scripts/backup-bot-host.sh    # also pack ./teamspeak (local TS6 volume)
-#   SLIM=1 ./scripts/backup-bot-host.sh          # exclude cache/tmp/logs (smaller, for SFTP)
+#   SLIM=1 ./scripts/backup-bot-host.sh          # exclude cache/tmp/logs/store (smaller, for SFTP)
 #   SLIM=1 EXTRA_EXCLUDES='data/radio.json' ./scripts/backup-bot-host.sh
 set -euo pipefail
 
@@ -57,7 +57,8 @@ fi
 # Exclude patterns for tar (--exclude=PATTERN, matched against member names).
 EXCLUDES=()
 if [[ "${SLIM:-0}" == "1" ]]; then
-  # Runtime caches / temp — not required to restore instances, cookies, DB, scripts.
+  # Runtime caches / temp / downloaded audio — not required to restore
+  # instances, cookies, DB, identities, scripts (audio re-downloads on play).
   EXCLUDES+=(
     --exclude='data/cache'
     --exclude='data/cache/*'
@@ -65,6 +66,8 @@ if [[ "${SLIM:-0}" == "1" ]]; then
     --exclude='data/tmp/*'
     --exclude='data/logs'
     --exclude='data/logs/*'
+    --exclude='data/store'
+    --exclude='data/store/*'
     --exclude='data/*/cache'
     --exclude='data/*/cache/*'
     --exclude='data/*/tmp'
@@ -72,7 +75,7 @@ if [[ "${SLIM:-0}" == "1" ]]; then
     --exclude='data/*/logs'
     --exclude='data/*/logs/*'
   )
-  echo "==> SLIM=1 — excluding cache/tmp/logs under data/"
+  echo "==> SLIM=1 — excluding cache/tmp/logs/store under data/"
 fi
 
 # Extra excludes: space-separated paths/globs, e.g. EXTRA_EXCLUDES='data/radio.json data/foo'
@@ -144,7 +147,8 @@ exists data/yt-dlp.conf || echo "WARN: data/yt-dlp.conf missing — entrypoint w
 
 if [[ "${SLIM:-0}" == "1" ]]; then
   echo
-  echo "NOTE: SLIM backup omitted cache/tmp/logs. Config, DB, cookies, identities, scripts are kept."
+  echo "NOTE: SLIM backup omitted cache/tmp/logs/store (cached WebM audio)."
+  echo "      Config, DB, cookies, identities, scripts are kept; audio re-downloads on play."
 fi
 
 echo

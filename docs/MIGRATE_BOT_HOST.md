@@ -25,7 +25,7 @@
 # 推荐：先停 Bot，避免库写到一半
 STOP=1 bash scripts/backup-bot-host.sh
 
-# 瘦身（推荐迁机 / SFTP）：排除 data 下 cache、tmp、logs
+# 瘦身（推荐迁机 / SFTP）：排除 data 下 cache、tmp、logs、store（缓存音频）
 STOP=1 SLIM=1 bash scripts/backup-bot-host.sh
 
 # 或指定输出路径
@@ -39,8 +39,8 @@ STOP=1 SLIM=1 bash scripts/backup-bot-host.sh /tmp/sinusbot-backup.tgz
 ```
 
 > `data/` 里 cookies / ts3 secrets 常为 `9987` + `600`，脚本会自动 `sudo tar` 打包；按提示输入 sudo 密码即可。  
-> `SLIM=1` 默认输出名为 `backups/sinusbot-host-slim_时间戳.tgz`，会排除 cache/tmp/logs；配置 / DB / cookies / 身份 / 脚本仍会带上。  
-> 打完包会打印 **Largest members**；若还有 `radio.json`、大头像等占体积，可再加：  
+> `SLIM=1` 默认输出名为 `backups/sinusbot-host-slim_时间戳.tgz`，会排除 `cache` / `tmp` / `logs` / **`store`（缓存 WebM）**；配置 / DB / cookies / 身份 / 脚本仍会带上。音频恢复后播放时重新下载。  
+> 打完包会打印 **Largest members**；若还有大文件，可再加：  
 > `EXTRA_EXCLUDES='data/radio.json'`（按列表里的路径填）。
 
 **约 30MB 对 rsync/scp 通常足够小**；SFTP 客户端超时多半是工具限制，优先：
